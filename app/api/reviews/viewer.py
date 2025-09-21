@@ -1,14 +1,18 @@
 import json
+import os
 from datetime import datetime
 
 from app.api.reviews.schema import ReviewRequest, ReviewResponse
 from app.database.database import db
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from openai import OpenAI
+
+# from openai import OpenAI
+from google import genai
 
 router = APIRouter()
-client = OpenAI()
+# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def serialize_review(review) -> dict:
@@ -23,42 +27,95 @@ def serialize_review(review) -> dict:
 
 
 async def process_review(review_id: str, code: str, language: str):
-    """Calls OpenAI API to process the code review."""
+    """Calls Gemini API to process the code review."""
     try:
         prompt = f"""
-        You are a code reviewer.
-        Analyze the following {language} snippet and return ONLY valid JSON with this structure:
+        You are an experienced code reviewer. Analyze this {language} code and provide structured feedback.
+        Return ONLY valid JSON with this exact structure:
 
         {{
-            "score": <integer 1-10>,
-            "issues": [ "list of identified issues" ],
-            "suggestions": [ "list of improvement suggestions" ],
-            "security": [ "list of security concerns" ],
-            "performance": [ "list of performance recommendations" ]
+            "score": <integer from 1 to 10>,
+            "issues": [
+                {{
+                    "line": <optional line number>,
+                    "severity": "low|medium|high",
+                    "description": "description of the issue",
+                    "suggestion": "how to fix it"
+                }}
+            ],
+            "suggestions": ["list of general improvement suggestions"],
+            "security_concerns": ["list of security issues"],
+            "performance_recommendations": ["list of performance optimizations"],
+            "overall_feedback": "brief overall assessment"
         }}
 
-        Code:
-            {code}
+        Code to review:
+        ```{language}
+        {code}
+        ```
         """
 
-        response = await client.chat.completions.acreate(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            response_format="json",
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={"response_mime_type": "application/json"},
         )
 
-        feedback_json = response.choices[0].message["content"]
-        feedback = json.loads(feedback_json)
+        # Parse and validate the JSON response
+        try:
+            feedback_data = json.loads(response.text)
+
+            # Validate the response structure
+            if (
+                not isinstance(feedback_data.get("score"), int)
+                or not 1 <= feedback_data["score"] <= 10
+            ):
+                feedback_data["score"] = 5  # Default score if invalid
+
+            # Ensure all arrays exist
+            for key in [
+                "issues",
+                "suggestions",
+                "security_concerns",
+                "performance_recommendations",
+            ]:
+                if key not in feedback_data or not isinstance(feedback_data[key], list):
+                    feedback_data[key] = []
+
+            if "overall_feedback" not in feedback_data:
+                feedback_data["overall_feedback"] = "No feedback provided"
+
+        except json.JSONDecodeError:
+            feedback_data = {
+                "score": 5,
+                "issues": ["Failed to parse AI response"],
+                "suggestions": [],
+                "security_concerns": [],
+                "performance_recommendations": [],
+                "overall_feedback": "Error processing review",
+            }
 
         await db.reviews.update_one(
             {"_id": ObjectId(review_id)},
-            {"$set": {"status": "completed", "feedback": feedback}},
+            {
+                "$set": {
+                    "status": "completed",
+                    "feedback": feedback_data,
+                    "completed_at": datetime.utcnow(),
+                }
+            },
         )
 
     except Exception as e:
         await db.reviews.update_one(
             {"_id": ObjectId(review_id)},
-            {"$set": {"status": "failed", "feedback": {"error": str(e)}}},
+            {
+                "$set": {
+                    "status": "failed",
+                    "feedback": {"error": str(e)},
+                    "failed_at": datetime.utcnow(),
+                }
+            },
         )
 
 
