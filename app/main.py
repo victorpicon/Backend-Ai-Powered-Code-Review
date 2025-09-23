@@ -52,12 +52,19 @@ async def stats_root():
 @app.on_event("startup")
 async def startup():
     """Create indexes used by queries and rate limiting on startup."""
-    await db.reviews.create_index("created_at")
-    await db.reviews.create_index("language")
-    await db.reviews.create_index("status")
-    await db.reviews.create_index([("ip", 1), ("created_at", 1)])
-    await db.reviews.create_index("code_hash")
-    await db.reviews.create_index("user_id")
+    try:
+        if db is not None:
+            await db.reviews.create_index("created_at")
+            await db.reviews.create_index("language")
+            await db.reviews.create_index("status")
+            await db.reviews.create_index([("ip", 1), ("created_at", 1)])
+            await db.reviews.create_index("code_hash")
+            await db.reviews.create_index("user_id")
+            print("Database indexes created successfully")
+        else:
+            print("Warning: Database not available, skipping index creation")
+    except Exception as e:
+        print(f"Warning: Failed to create database indexes: {e}")
 
 
 if __name__ == "__main__":
