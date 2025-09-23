@@ -1,6 +1,12 @@
+import os
+import sys
+from pathlib import Path
+
+# Add the parent directory to Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from app.api.reviews import viewer as reviews
 from app.api.auth import routes as auth
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.database import db
