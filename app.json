@@ -1,0 +1,41 @@
+{
+  "name": "Backend AI Code Review",
+  "description": "FastAPI backend for AI-powered code review system",
+  "repository": "https://github.com/victorpicon/Backend-Ai-Powered-Code-Review",
+  "logo": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png",
+  "keywords": ["python", "fastapi", "mongodb", "ai", "code-review"],
+  "stack": "container",
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "free"
+    }
+  },
+  "addons": [
+    {
+      "plan": "mongolab:sandbox"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "PYTHON_VERSION": {
+      "description": "Python version to use",
+      "value": "3.11.0"
+    },
+    "JWT_SECRET": {
+      "description": "Secret key for JWT token generation",
+      "generator": "secret"
+    },
+    "CORS_ALLOW_ORIGINS": {
+      "description": "CORS allowed origins",
+      "value": "https://frontend-ai-powered-code-review-pjhn84buv-revems-projects.vercel.app"
+    }
+  },
+  "scripts": {
+    "postdeploy": "python -c 'import app.database.database; print(\"Database connection test\")'"
+  }
+}
