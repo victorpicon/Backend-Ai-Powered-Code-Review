@@ -11,7 +11,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, W
 from fastapi.responses import StreamingResponse
 from google import genai
 from openai import OpenAI
-from app.api.auth.routes import get_current_user
+from app.api.auth.routes import get_current_user, get_current_user_optional
+from typing import Optional
 
 router = APIRouter()
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -179,7 +180,7 @@ async def enforce_rate_limit(ip: str) -> None:
 
 
 @router.post("/", response_model=ReviewResponse)
-async def create_review(request: ReviewRequest, background_tasks: BackgroundTasks, http_request: Request, user=Depends(get_current_user)):
+async def create_review(request: ReviewRequest, background_tasks: BackgroundTasks, http_request: Request, user: Optional[dict] = Depends(get_current_user_optional)):
     """
     Submit a new code snippet for AI review.
 
@@ -190,7 +191,7 @@ async def create_review(request: ReviewRequest, background_tasks: BackgroundTask
     - Rate limiting: 10 reviews per IP per hour
     - Code caching: Identical code returns cached results instantly
     - Background processing: AI analysis runs asynchronously
-    - User association: Links review to authenticated user
+    - User association: Links review to authenticated user (if provided)
     
     Args:
         request (ReviewRequest): Review data containing:
@@ -198,14 +199,13 @@ async def create_review(request: ReviewRequest, background_tasks: BackgroundTask
             - language (str): Programming language (required)
         background_tasks: FastAPI background tasks handler
         http_request: HTTP request object for IP extraction
-        user: Current authenticated user (injected by dependency)
+        user: Current authenticated user (optional, injected by dependency)
     
     Returns:
         ReviewResponse: Created review with status and metadata
     
     Raises:
         HTTPException: 429 if rate limit exceeded
-        HTTPException: 401 if not authenticated
     
     Example:
         Request:

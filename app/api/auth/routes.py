@@ -47,6 +47,38 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     return user
 
 
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """
+    Extract and validate the current authenticated user from JWT token (optional).
+    
+    This dependency function extracts the JWT token from the Authorization header,
+    validates it, and retrieves the corresponding user from the database.
+    Returns None if no valid token is provided.
+    
+    Args:
+        credentials: HTTP Bearer token from Authorization header (optional)
+    
+    Returns:
+        dict or None: User document from database or None if not authenticated
+    
+    Example:
+        Request Headers (optional):
+        ```
+        Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        ```
+    """
+    if not credentials:
+        return None
+    try:
+        subject = decode_token(credentials.credentials)
+        if not subject:
+            return None
+        user = await db.users.find_one({"_id": subject}) or await db.users.find_one({"email": subject})
+        return user
+    except Exception:
+        return None
+
+
 @router.post("/register")
 async def register(data: dict):
     """
