@@ -16,3 +16,5 @@ class ReviewResponse(BaseModel):
     status: str
     created_at: datetime
     feedback: Optional[dict] = None
+    completed_at: Optional[datetime] = None
+    failed_at: Optional[datetime] = None
